@@ -1,6 +1,6 @@
 #ifndef INFERENCE_API_H_
 #define INFERENCE_API_H_
-
+#pragma once
 #include <stdio.h>
 #include <string>
 #include <map>
@@ -15,56 +15,84 @@
 #define INFERENCE_API
 #endif
 
+struct Shape {
+	unsigned int N{ 0 };
+	unsigned int C{ 0 };
+	unsigned int H{ 0 };
+	unsigned int W{ 0 };
+	unsigned int count() {
+		return N*C*H*W;
+	}
+};
+
 struct IFparams {
+	char* Root_Path;
 	char* Model_Path;
 	char* Proto_Path;
 	bool CPU_ONLY{ 1 };
-};
-
-struct Shape {
-	unsigned int N{0};
-	unsigned int C{0};
-	unsigned int H{0};
-	unsigned int W{0};
+	//Shape shape;
 };
 
 struct Datum {
 	Shape shape;
-	void* data;//NCHW
+	float* outter_data = nullptr;
+	float* data = nullptr;//NCHW
+
 	Datum() { 
 		data = nullptr;
 	}
+	float* Getdata() {
+		if (data != nullptr) {
+			return data;
+		}
+		else {
+			unsigned int size = shape.count();
+			data = new float[size];
+			return data;
+		}
+	}
+	void Reshape(Shape s) {
+		shape = s;
+		if (data != nullptr) {
+			delete[] data;
+			data = nullptr;
+		}
+	}
 	~Datum() {
-		delete[] data;
+		if (data != nullptr){
+			delete[] data;
+			data = nullptr;
+		}
 	}
 };
+static bool compare_shape(const Shape& S1, const Shape& S2) {
+	if (S1.W != S2.W || S1.H != S2.H ||
+		S1.C != S2.C || S1.N != S2.N) {
+		return 1;
+	}
+	return 0;
+}
+class RPNDetection;
 
-
-class INFERENCE_API IF {
+class INFERENCE_API TNT {
+	friend class RPNDetection;
 public:
 
 	typedef std::map<std::string, Datum> IFReult;
 
-	IF() {}
+	explicit TNT(const IFparams& ifp);
 
-	virtual~IF() {}
+	virtual~TNT();
 
 	void Init(const IFparams& ifp);
 
-	void inference(Datum& Data);
+	void Inference(const Datum& Data);
 
-	IFReult* GetReult();
-
-private:
-
-	void ReshapeNet(const Shape& Input_shape);
-
-	void ConfigureOut();
+	TNT::IFReult* GetReult();
 
 private:
+	void* Engine;
 
-	Shape Input_Shape_;
-
-	IFReult OutPut_;
+	IFReult* OutPut_;
 };
 #endif
